@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     )
 
     get_prod_hash_command: str = "./get_prod_hash.sh"
-    project_path: str
+    project_path: str = "/repo"
     debug_env: str = ".env.debug.template"
     worktree_base: str = "/tmp/debug-worktrees"
 
