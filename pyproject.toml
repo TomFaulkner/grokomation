@@ -1,0 +1,20 @@
+[project]
+name = "grokomation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Tom Faulkner", email = "faulkner@pm.me" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.128.0",
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+grokomation = "grokomation:main"
+
+[build-system]
+requires = ["uv_build>=0.9.17,<0.10.0"]
+build-backend = "uv_build"
