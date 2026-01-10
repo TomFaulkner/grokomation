@@ -22,8 +22,10 @@ git fetch origin master  # Update local master ref
 MASTER_HASH=$(git rev-parse origin/master)
 if [ "$PROD_HASH" = "$MASTER_HASH" ]; then
     COMPARE_ADVICE="The error occurred on the latest master commit—no newer fixes available."
+    MATCHES_MASTER=true
 else
     COMPARE_ADVICE="The error occurred on commit $PROD_HASH. Compare with current master ($MASTER_HASH) to see if the bug is already fixed (e.g., git diff $PROD_HASH..$MASTER_HASH)."
+    MATCHES_MASTER=false
 fi
 
 # Create worktree at prod hash
@@ -44,4 +46,4 @@ opencode serve --port $PORT --hostname 127.0.0.1 --no-mdns > server.log 2>&1 &
 echo $! > /tmp/opencode-pid-${CORR_ID}
 
 # Output to n8n
-echo "{\"port\": $PORT, \"worktree\": \"$WORKTREE_DIR\", \"prod_hash\": \"$PROD_HASH\", \"compare_advice\": \"$COMPARE_ADVICE\"}"
+echo "{\"port\": $PORT, \"worktree\": \"$WORKTREE_DIR\", \"prod_hash\": \"$PROD_HASH\", \"compare_advice\": \"$COMPARE_ADVICE\", \"matches_master\": $MATCHES_MASTER}"
