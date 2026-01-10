@@ -39,7 +39,7 @@ EXPOSE 8000
 
 RUN mkdir -p /home/appuser/.ssh && \
     chmod 700 /home/appuser/.ssh && \
-    echo "Host github.com\n  IdentityFile /home/appuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new" > /home/appuser/.ssh/config && \
+    echo "Host github.com\n  IdentityFile /home/appuser/.ssh/deploy_key\n  StrictHostKeyChecking accept-new" > /home/appuser/.ssh/config && \
     chmod 600 /home/appuser/.ssh/config
 
 
@@ -53,7 +53,6 @@ RUN groupadd -g $GID appgroup && \
     chown -R appuser:appgroup /home/appuser && \
     chmod 700 /home/appuser/.ssh && \
     chmod 600 /home/appuser/.ssh/known_hosts && \
-    chown -R appuser:appgroup /app && \
     mkdir -p /repo && \
     mkdir -p /app/worktrees && \
     chown -R appuser:appgroup /repo && \
