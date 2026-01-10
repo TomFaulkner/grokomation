@@ -19,15 +19,6 @@ from grokomation.opencode import check_request_validity, InvalidRequestException
 
 settings = settings  # loading for settings validation for shell scripts
 
-app = FastAPI()
-instances: dict[str, int] = {}  # correlation_id → internal_port
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,14 +29,26 @@ async def lifespan(app: FastAPI):
 
     logger.info(f"Running as UID {uid} (non-root)")
 
-    # / startup
-    yield  # The app runs normally here
-    # Shutdown: Runs after all requests are done
+    # Clone repo if not present
+    repo_path = "/repo"
+    if not os.path.exists(os.path.join(repo_path, ".git")):
+        repo_url = os.getenv("REPO_URL")
+        if repo_url:
+            logger.info(f"Cloning repo from {repo_url} to {repo_path}")
+            subprocess.run(["git", "clone", repo_url, repo_path], check=True)
+            logger.info("Repo cloned successfully")
 
-    logger.info("Shutdown: Cleaning up...")
+    yield  # The app runs normally here
 
 
 app = FastAPI(lifespan=lifespan)
+instances: dict[str, int] = {}  # correlation_id → internal_port
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 class SetupRequest(BaseModel):

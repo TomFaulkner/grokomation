@@ -32,7 +32,16 @@ RUN groupadd -g 1001 appgroup && \
 # Install uv in final stage
 RUN pip install --no-cache-dir uv==0.9.17
 
+# Install Git for script dependencies
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # Copy uv cache & installed packages from builder
+COPY --from=builder --chown=appuser:appgroup /root/.cache/uv /app/.cache/uv
+COPY --from=builder --chown=appuser:appgroup /app /app
+
+# Create writable directories for appuser
+RUN mkdir -p /app/worktrees /app/.ssh && \
+    chown -R appuser:appgroup /app/worktrees /app/.ssh
 COPY --from=builder --chown=appuser:appgroup /root/.cache/uv /app/.cache/uv
 COPY --from=builder --chown=appuser:appgroup /app /app
 
