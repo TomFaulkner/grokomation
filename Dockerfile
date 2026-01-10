@@ -39,27 +39,25 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /root/.cache/uv /app/.cache/uv
 COPY --from=builder /app /app
 
-# Chown everything to HOST_UID
-RUN chown -R ${HOST_UID}:appgroup /app /app/.cache
-
-# Create writable directories for appuser (but since user overridden, for worktrees)
-RUN mkdir -p /app/worktrees /app/.ssh && \
-    chown -R ${HOST_UID}:appgroup /app/worktrees /app/.ssh
-COPY --from=builder --chown=appuser:appgroup /root/.cache/uv /app/.cache/uv
-COPY --from=builder --chown=appuser:appgroup /app /app
-
-WORKDIR /app
-
-# Switch to non-root user
-USER 1001
-
 # Build args
 ARG GIT_COMMIT
 ENV GIT_COMMIT=$GIT_COMMIT
 ARG HOST_UID=1001
 
-# Chown /app to HOST_UID for proper access when user is set in Compose
+# Chown everything to HOST_UID
 RUN chown -R ${HOST_UID}:appgroup /app
+
+# Create writable directories for appuser (but since user overridden, for worktrees)
+RUN mkdir -p /app/worktrees /app/.ssh && \
+    chown -R ${HOST_UID}:appgroup /app/worktrees /app/.ssh
+
+WORKDIR /app
+
+# Expose port
+EXPOSE 8000
+
+# Switch to non-root user (after all chown operations)
+USER 1001
 
 # Expose port
 EXPOSE 8000
