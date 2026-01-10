@@ -25,9 +25,15 @@ FROM python:3.14-slim
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    git openssh-client && \
+    git openssh-client curl ca-certificates gpg && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+    tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends gh && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
-    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app /app
 
@@ -45,6 +51,8 @@ RUN mkdir -p /home/appuser/.ssh && \
 
 ARG UID=1000
 ARG GID=1000
+ARG GIT_USER="Grokomation Service"
+ARG GIT_EMAIL="grokomation@yourdomain.com"
 
 RUN groupadd -g $GID appgroup && \
     useradd -u $UID -g appgroup -m -d /home/appuser -s /bin/bash appuser && \
@@ -58,6 +66,28 @@ RUN groupadd -g $GID appgroup && \
     chown -R appuser:appgroup /repo && \
     chown -R appuser:appgroup /app/worktrees
 USER appuser
+
+# Preconfigure git for non-root user (appuser)
+RUN git config --global user.name "$GIT_USER" && \
+    git config --global user.email "$GIT_EMAIL" && \
+    git config --global --add safe.directory '*' && \
+    git config --global init.defaultBranch master && \
+    git config --global push.default simple && \
+
+    echo "Git global config initialized for ${USER}"
+
+    # Optional: if you ever want signed commits (needs gpg setup)
+    # git config --global commit.gpgsign true
+    # git config --global user.signingkey YOUR_KEY_ID
+
+RUN mkdir -p ~/.local/bin && \
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
+# Install opencode into ~/.local/bin instead of ~/.opencode/bin
+RUN curl -fsSL https://opencode.ai/install | \
+    XDG_BIN_HOME=$HOME/.local/bin bash
+
+ENV PATH="/home/appuser/.local/bin:${PATH}"
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1 || curl -f http://localhost:8000 || exit 1
