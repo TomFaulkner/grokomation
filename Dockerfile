@@ -50,9 +50,13 @@ WORKDIR /app
 # Switch to non-root user
 USER 1001
 
-# Build arg for git commit (optional)
+# Build args
 ARG GIT_COMMIT
 ENV GIT_COMMIT=$GIT_COMMIT
+ARG HOST_UID=1001
+
+# Chown /app to HOST_UID for proper access when user is set in Compose
+RUN chown -R ${HOST_UID}:appgroup /app
 
 # Expose port
 EXPOSE 8000
