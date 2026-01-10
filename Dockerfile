@@ -44,7 +44,10 @@ RUN mkdir -p /home/appuser/.ssh && \
 
 RUN ssh-keyscan -t ed25519 github.com >> /home/appuser/.ssh/known_hosts
 
-USER 1000
+RUN groupadd -g 1000 appgroup && \
+    useradd -u 1000 -g appgroup -m -d /home/appuser -s /bin/bash appuser && \
+    mkdir -p /home/appuser/.ssh && chown -R appuser:appgroup /home/appuser/.ssh
+USER appuser
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1 || curl -f http://localhost:8000 || exit 1
