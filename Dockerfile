@@ -54,6 +54,8 @@ RUN groupadd -g $GID appgroup && \
     chmod 700 /home/appuser/.ssh && \
     chmod 600 /home/appuser/.ssh/known_hosts && \
     chown -R appuser:appgroup /app && \
+    mkdir -p /repo && \
+    mkdir -p /app/worktrees && \
     chown -R appuser:appgroup /repo && \
     chown -R appuser:appgroup /app/worktrees
 USER appuser
