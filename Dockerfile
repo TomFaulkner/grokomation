@@ -29,6 +29,9 @@ FROM python:3.14-slim
 RUN groupadd -g 1001 appgroup && \
     useradd -r -u 1001 -g appgroup -m -d /app appuser
 
+# Install uv in final stage
+RUN pip install --no-cache-dir uv==0.9.17
+
 # Copy uv cache & installed packages from builder
 COPY --from=builder --chown=appuser:appgroup /root/.cache/uv /app/.cache/uv
 COPY --from=builder --chown=appuser:appgroup /app /app
