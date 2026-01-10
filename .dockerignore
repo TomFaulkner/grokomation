@@ -1,0 +1,14 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env*
+tests/
+docs/
+*.log
+coverage/
+htmlcov/

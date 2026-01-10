@@ -1,15 +1,21 @@
+from contextlib import asynccontextmanager
 import logging
+import os
 import subprocess
 from typing import cast
 from urllib.parse import unquote
 
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, Request, Response, HTTPException, Query
 from httpx import AsyncClient
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from grokomation.config import settings
 from grokomation import processes
 from grokomation.opencode import check_request_validity, InvalidRequestException
+
 
 settings = settings  # loading for settings validation for shell scripts
 
@@ -17,6 +23,29 @@ app = FastAPI()
 instances: dict[str, int] = {}  # correlation_id → internal_port
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Runs before the app starts accepting requests
+    uid = os.getuid()
+    if uid == 0:
+        raise RuntimeError("Security error: FastAPI is running as root (UID 0)!")
+
+    logger.info(f"Running as UID {uid} (non-root)")
+
+    # / startup
+    yield  # The app runs normally here
+    # Shutdown: Runs after all requests are done
+
+    logger.info("Shutdown: Cleaning up...")
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 class SetupRequest(BaseModel):
@@ -37,7 +66,7 @@ class SetupAPIResponse(BaseModel):
     corr_id: str
 
 
-@app.post("/setup")
+@app.post("/instances", tags=["instances"])
 async def setup(data: SetupRequest) -> SetupAPIResponse:
     try:
         results = subprocess.run(
@@ -61,37 +90,7 @@ async def setup(data: SetupRequest) -> SetupAPIResponse:
     )
 
 
-@app.api_route("/proxy/{corr_id}/{path:path}", methods=["GET", "POST"])
-async def proxy(corr_id: str, path: str, request: Request):
-    if corr_id not in instances:
-        raise HTTPException(404, "No active session")
-    path = unquote(path)
-    try:
-        await check_request_validity(
-            "localhost", instances[corr_id], request.method, path
-        )
-    except InvalidRequestException as e:
-        raise HTTPException(422, str(e))
-    url = f"http://localhost:{instances[corr_id]}/{path}"
-    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
-    headers["accept"] = "application/json"
-    async with AsyncClient() as client:
-        resp = await client.request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            params=request.query_params,
-            content=await request.body(),
-        )
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        headers=dict(resp.headers),
-    )
-
-
-# Cleanup endpoint (called by n8n when "DONE")
-@app.post("/cleanup/{corr_id}")
+@app.delete("/instances/{corr_id}", tags=["instances"])
 async def cleanup(corr_id: str):
     try:
         results = subprocess.run(
@@ -110,16 +109,110 @@ async def cleanup(corr_id: str):
     return {"status": "cleaned"}
 
 
-@app.get("/instances")
+@app.get("/instances", tags=["instances"])
 def get_instances() -> dict[str, int]:
     return instances
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 def health_check() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-@app.get("/proc/check_port")
+@app.get("/proc/check_port", tags=["processes"])
 async def check_port(port: int) -> processes.OpenCodeHealthResponse:
     return await processes.check_opencode_health(port)
+
+
+@app.get("/proc/list_opencode", tags=["processes"])
+def list_opencode() -> list[dict[str, int | str | None]]:
+    return processes.list_opencode_processes()
+
+
+class KillProcessResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@app.delete("/proc/{pid}", tags=["processes"])
+def kill_process(pid: int) -> KillProcessResponse:
+    success, msg = processes.kill_opencode_process(pid)
+    return KillProcessResponse(success=success, message=msg)
+
+
+# Proxy endpoints
+
+
+async def _proxy_request(corr_id: str, path: str, request: Request) -> Response:
+    if corr_id not in instances:
+        raise HTTPException(404, "No active session")
+    if not path.startswith("/"):
+        path = "/" + path
+    try:
+        await check_request_validity(
+            "localhost", instances[corr_id], request.method, path
+        )
+    except InvalidRequestException as e:
+        raise HTTPException(422, str(e))
+    url = f"http://localhost:{instances[corr_id]}{path}"
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    headers["content-type"] = "application/json"
+    async with AsyncClient() as client:
+        resp = await client.request(
+            method=request.method,
+            url=url,
+            headers=headers,
+            params=request.query_params,
+            content=await request.body(),
+        )
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=dict(resp.headers),
+    )
+
+
+@app.get("/instances/{corr_id}/proxy", tags=["instances"])
+async def proxy_get(
+    corr_id: str,
+    request: Request,
+    path: str = Query("/", description="The path to proxy to the opencode instance"),
+):
+    return await _proxy_request(corr_id, path, request)
+
+
+@app.post("/instances/{corr_id}/proxy", tags=["instances"])
+async def proxy_post(
+    corr_id: str,
+    request: Request,
+    path: str = Query("/", description="The path to proxy to the opencode instance"),
+):
+    return await _proxy_request(corr_id, path, request)
+
+
+@app.put("/instances/{corr_id}/proxy", tags=["instances"])
+async def proxy_put(
+    corr_id: str,
+    request: Request,
+    path: str = Query("/", description="The path to proxy to the opencode instance"),
+):
+    return await _proxy_request(corr_id, path, request)
+
+
+@app.patch("/instances/{corr_id}/proxy", tags=["instances"])
+async def proxy_patch(
+    corr_id: str,
+    request: Request,
+    path: str = Query("/", description="The path to proxy to the opencode instance"),
+):
+    return await _proxy_request(corr_id, path, request)
+
+
+@app.delete("/instances/{corr_id}/proxy", tags=["instances"])
+@limiter.limit("5/minute")
+async def proxy_delete(
+    corr_id: str,
+    request: Request,
+    path: str = Query("/", description="The path to proxy to the opencode instance"),
+):
+    return await _proxy_request(corr_id, path, request)
