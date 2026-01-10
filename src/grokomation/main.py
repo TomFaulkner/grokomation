@@ -6,9 +6,13 @@ from fastapi import FastAPI, Request, Response, HTTPException
 from httpx import AsyncClient
 from pydantic import BaseModel
 
+from grokomation.config import settings
+
+settings = settings  # loading for settings validation for shell scripts
+
 app = FastAPI()
 instances: dict[str, int] = {}  # correlation_id → internal_port
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +38,7 @@ class SetupAPIResponse(BaseModel):
 async def setup(data: SetupRequest) -> SetupAPIResponse:
     try:
         results = subprocess.run(
-            ["setup_env.sh", data.correlation_id],
+            ["./setup_env.sh", data.correlation_id],
             check=True,
             capture_output=True,
             text=True,
@@ -42,6 +46,8 @@ async def setup(data: SetupRequest) -> SetupAPIResponse:
         # shell_res_json = cast(
         #     "dict[str, str | int | bool]", json.loads(results.stdout.splitlines()[-1])
         # )
+        logger.debug("Shell stdout: %s", results.stdout)
+        logger.error("Shell stderr: %s", results.stderr)
         shell_response = SetupShellResponse.model_validate_json(
             results.stdout.splitlines()[-1]
         )
@@ -80,11 +86,13 @@ async def proxy(corr_id: str, path: str, request: Request):
 async def cleanup(corr_id: str):
     try:
         results = subprocess.run(
-            ["cleanup_env.sh", corr_id],
+            ["./cleanup_env.sh", corr_id],
             check=True,
             capture_output=True,
             text=True,
         )
+        logger.debug("cleanup_env.sh stdout: %s", results.stdout)
+        logger.debug("cleanup_env.sh stderr: %s", results.stderr)
     except subprocess.CalledProcessError as e:
         logging.exception(f"Cleanup failed: {cast('str', e.stderr)}")
         raise HTTPException(500, f"Cleanup failed: {e}")
