@@ -50,7 +50,12 @@ RUN groupadd -g $GID appgroup && \
     useradd -u $UID -g appgroup -m -d /home/appuser -s /bin/bash appuser && \
     mkdir -p /home/appuser/.ssh && \
     ssh-keyscan -t ed25519 github.com >> /home/appuser/.ssh/known_hosts && \
-    chown -R appuser:appgroup /home/appuser/.ssh
+    chown -R appuser:appgroup /home/appuser && \
+    chmod 700 /home/appuser/.ssh && \
+    chmod 600 /home/appuser/.ssh/known_hosts && \
+    chown -R appuser:appgroup /app && \
+    chown -R appuser:appgroup /repo && \
+    chown -R appuser:appgroup /app/worktrees
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
