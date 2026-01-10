@@ -37,6 +37,13 @@ USER 1000
 
 EXPOSE 8000
 
+RUN mkdir -p /home/appuser/.ssh && \
+    chmod 700 /home/appuser/.ssh && \
+    echo "Host github.com\n  IdentityFile /home/appuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new" > /home/appuser/.ssh/config && \
+    chmod 600 /home/appuser/.ssh/config
+
+RUN ssh-keyscan -t ed25519 github.com >> /home/appuser/.ssh/known_hosts
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1 || curl -f http://localhost:8000 || exit 1
 
