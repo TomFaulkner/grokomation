@@ -42,11 +42,15 @@ RUN mkdir -p /home/appuser/.ssh && \
     echo "Host github.com\n  IdentityFile /home/appuser/.ssh/id_ed25519\n  StrictHostKeyChecking accept-new" > /home/appuser/.ssh/config && \
     chmod 600 /home/appuser/.ssh/config
 
-RUN ssh-keyscan -t ed25519 github.com >> /home/appuser/.ssh/known_hosts
 
-RUN groupadd -g 1000 appgroup && \
-    useradd -u 1000 -g appgroup -m -d /home/appuser -s /bin/bash appuser && \
-    mkdir -p /home/appuser/.ssh && chown -R appuser:appgroup /home/appuser/.ssh
+ARG UID=1000
+ARG GID=1000
+
+RUN groupadd -g $GID appgroup && \
+    useradd -u $UID -g appgroup -m -d /home/appuser -s /bin/bash appuser && \
+    mkdir -p /home/appuser/.ssh && \
+    ssh-keyscan -t ed25519 github.com >> /home/appuser/.ssh/known_hosts && \
+    chown -R appuser:appgroup /home/appuser/.ssh
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
