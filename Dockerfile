@@ -104,7 +104,12 @@ RUN mkdir -p ~/.local/bin && \
 RUN curl -fsSL https://opencode.ai/install | \
     XDG_BIN_HOME=$HOME/.local/bin bash
 
-ENV PATH="/home/appuser/.local/bin:${PATH}"
+ENV PATH="/home/appuser/.local/bin:${PATH}" \
+    PROJECT_PATH="/repo" \
+    WORKTREE_BASE="/app/worktrees" \
+    PORT=8000 \
+    UV_NO_CACHE=1 \
+    UV_LINK_MODE=copy
 
 # Pre-install the most common tools OpenCode uses
 RUN uv tool install ruff \
