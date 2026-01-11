@@ -1,6 +1,39 @@
 #!/bin/bash
+
 find_free_port() {
-    comm -23 <(seq 4100 4200) <(ss -tan | awk '{print $4}' | cut -d':' -f2 | sort | uniq) | head -1
+    local range_start=4100
+    local range_end=4200
+    local used_ports
+
+    if command -v ss >/dev/null 2>&1; then
+        # Preferred: use ss when available
+        used_ports=$(ss -tan 2>/dev/null | awk '
+            NR>1 { split($4, a, ":"); print a[length(a)] }
+        ' | sort -un)
+    else
+        # Fallback: parse /proc/net/tcp* directly (no external tools needed)
+        used_ports=$(awk '
+            BEGIN { FS=": *|  *"}
+            NR>1 && $2 != "local_address" {
+                # Last field before state is the local port in hex
+                port_hex = $(NF-1)
+                if (port_hex ~ /^[0-9A-Fa-f]+$/) {
+                    print strtonum("0x" port_hex)
+                }
+            }
+        ' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -un)
+    fi
+
+    # Find first free port in range
+    for ((port=range_start; port<=range_end; port++)); do
+        if ! echo "$used_ports" | grep -q "^$port$"; then
+            echo "$port"
+            return 0
+        fi
+    done
+
+    echo ""  # No free port found
+    return 1
 }
 
 
