@@ -128,7 +128,3 @@ uv run ruff format .
 - **Port Conflicts**: OpenCode instances use ports 4100-4200; ensure availability.
 - **Volume Issues**: Named volumes persist data; inspect with `docker volume ls`.
 
-## License
-
-[MIT License](LICENSE)</content>
-<parameter name="filePath">/home/tom/dev/grokomation/README.md
