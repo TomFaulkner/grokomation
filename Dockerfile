@@ -25,17 +25,34 @@ FROM python:3.14-slim
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    git openssh-client curl ca-certificates gpg && \
+        git \
+	openssh-client \
+	curl \
+	ca-certificates \
+	gpg \
+	jq \
+	ripgrep \
+	fd-find \
+	fzf \
+	bat \
+	git-delta \
+	tokei \
+	&& \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
     tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
     apt-get update && \
     apt-get install -y --no-install-recommends gh && \
     rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+    apt-get clean && \
+    ln -s /usr/bin/batcat /usr/local/bin/bat && \
+    ln -s /usr/bin/fdfind /usr/local/bin/fd
 
 
 COPY --from=builder /app /app
+
+# Make these available for the AI
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH"
@@ -88,6 +105,16 @@ RUN curl -fsSL https://opencode.ai/install | \
     XDG_BIN_HOME=$HOME/.local/bin bash
 
 ENV PATH="/home/appuser/.local/bin:${PATH}"
+
+# Pre-install the most common tools OpenCode uses
+RUN uv tool install ruff \
+    && uv tool install ty \
+    && echo "Pre-installed: ruff, ty, uv" >> ~/.bashrc
+
+RUN pip install --no-cache-dir \
+    pre-commit \
+    pytest \
+    pytest-asyncio
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1 || curl -f http://localhost:8000 || exit 1
