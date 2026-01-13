@@ -9,6 +9,7 @@ from typing import cast
 from urllib.parse import unquote
 
 from fastapi import FastAPI, Request, Response, HTTPException, Query
+import httpx
 from httpx import AsyncClient
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -188,6 +189,10 @@ async def _proxy_request(corr_id: str, path: str, request: Request) -> Response:
         )
     except InvalidRequestException as e:
         raise HTTPException(422, str(e))
+    except httpx.RequestError as e:
+        raise HTTPException(502, f"Error fetching OpenAPI spec: {str(e)}")
+    except Exception as e:
+        raise HTTPException(500, f"Error validating request: {str(e)}")
     url = f"http://localhost:{instances[corr_id]}{path}"
     headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
     headers["content-type"] = "application/json"
