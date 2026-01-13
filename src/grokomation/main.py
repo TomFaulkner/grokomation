@@ -143,7 +143,10 @@ def health_check() -> dict[str, str]:
 
 @app.get("/proc/check_port", tags=["processes"])
 async def check_port(port: int) -> processes.OpenCodeHealthResponse:
-    return await processes.check_opencode_health(port)
+    try:
+        return await processes.check_opencode_health(port)
+    except processes.OpenCodeHealthError as e:
+        raise HTTPException(502, str(e))
 
 
 @app.get("/proc/list_opencode", tags=["processes"])
