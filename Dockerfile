@@ -37,6 +37,13 @@ RUN apt-get update && \
 	bat \
 	git-delta \
 	tokei \
+	iproute2 \
+	htop \
+	procps \
+	strace \
+	lsof \
+	yq \
+	redis-tools \
 	&& \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
@@ -112,8 +119,15 @@ ENV PATH="/home/appuser/.local/bin:${PATH}" \
     UV_LINK_MODE=copy
 
 # Pre-install the most common tools OpenCode uses
-RUN uv tool install ruff \
-    && uv tool install ty \
+RUN uv tool install \
+    ruff \
+    ty \
+    pytest-cov \
+    bandit \
+    pytest-benchmark \
+    memory-profiler \
+    line-profiler \
+    py-spy \
     && echo "Pre-installed: ruff, ty, uv" >> ~/.bashrc
 
 RUN pip install --no-cache-dir \
