@@ -118,22 +118,24 @@ ENV PATH="/home/appuser/.local/bin:${PATH}" \
     UV_NO_CACHE=1 \
     UV_LINK_MODE=copy
 
-# Pre-install the most common tools OpenCode uses
-RUN uv tool install \
-    ruff \
-    ty \
-    pytest-cov \
-    bandit \
-    pytest-benchmark \
-    memory-profiler \
-    line-profiler \
-    py-spy \
-    && echo "Pre-installed: ruff, ty, uv" >> ~/.bashrc
-
 RUN pip install --no-cache-dir \
     pre-commit \
     pytest \
     pytest-asyncio
+
+# Pre-install the most common tools OpenCode uses
+RUN set -e && \
+    for pkg in \
+        pytest-cov \
+        pytest-benchmark \
+        bandit \
+        py-spy \
+        memory-profiler \
+    ; do \
+        uv tool install "$pkg" ; \
+    done && \
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1 || curl -f http://localhost:8000 || exit 1
