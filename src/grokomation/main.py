@@ -79,6 +79,8 @@ class SetupShellResponse(BaseModel):
     master_hash: str
     compare_advice: str
     matches_master: bool
+    pid_file: str
+    pid: int
 
 
 class SetupAPIResponse(BaseModel):
@@ -107,6 +109,10 @@ async def setup(data: SetupRequest) -> SetupAPIResponse:
         raise HTTPException(500, f"Setup failed: {e}")
 
     instances[data.correlation_id] = shell_response.port
+    logger.info(
+        f"Setup complete for correlation_id={data.correlation_id} on port {shell_response.port}"
+    )
+    logger.info("Shell response: %s", shell_response)
     return SetupAPIResponse(
         **{"status": "setup_complete", "correlation_id": data.correlation_id}
     )

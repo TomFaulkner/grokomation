@@ -79,4 +79,4 @@ opencode serve --port $PORT --hostname 127.0.0.1 --no-mdns > server.log 2>&1 &
 echo $! > /tmp/opencode-pid-${CORR_ID}
 
 # Output to n8n
-echo "{\"port\": $PORT, \"worktree\": \"$WORKTREE_DIR\", \"prod_hash\": \"$PROD_HASH\", \"compare_advice\": \"$COMPARE_ADVICE\", \"matches_master\": $MATCHES_MASTER, \"master_hash\": \"$MASTER_HASH\"}"
+echo "{\"port\": $PORT, \"worktree\": \"$WORKTREE_DIR\", \"prod_hash\": \"$PROD_HASH\", \"compare_advice\": \"$COMPARE_ADVICE\", \"matches_master\": $MATCHES_MASTER, \"master_hash\": \"$MASTER_HASH\", \"pid_file\": \"/tmp/opencode-pid-${CORR_ID}\", \"pid\": $(cat /tmp/opencode-pid-${CORR_ID}) }"
