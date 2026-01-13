@@ -8,8 +8,12 @@ def list_opencode_processes() -> list[dict[str, int | str | None]]:
     instances: list[dict[str, int | str | None]] = []
     for proc in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
-            cmd = proc.info["cmdline"] or []
-            if "opencode" in cmd and "serve" in cmd:
+            cmd: list[str] = proc.info["cmdline"] or []
+            if (
+                "opencode"
+                in "".join(cmd)  # command may include path to opencode, so join
+                and "serve" in cmd
+            ):
                 # Try to extract port from cmdline (e.g., --port 4106)
                 port = None
                 hostname = ""
