@@ -1,5 +1,7 @@
+import re
 import time
 import httpx
+from urllib.parse import unquote
 
 
 class InvalidRequestException(Exception):
@@ -7,6 +9,12 @@ class InvalidRequestException(Exception):
 
 
 _spec_cache: dict[tuple[str, int], tuple[dict, float]] = {}
+
+
+def path_template_to_regex(template: str) -> str:
+    """Convert an OpenAPI path template to a regex pattern."""
+    pattern = re.sub(r"\{[^}]+\}", r"[^/]+", template)
+    return f"^{pattern}$"
 
 
 async def get_openapi_spec(hostname: str, port: int, ttl: int = 600) -> dict:
@@ -34,14 +42,19 @@ def validate_request(spec: dict, method: str, path: str) -> None:
     if "paths" not in spec:
         raise InvalidRequestException("Invalid OpenAPI spec: no paths defined")
 
-    if path not in spec["paths"]:
-        raise InvalidRequestException(f"Path '{path}' not found in OpenAPI spec")
+    # URL-decode the path to handle encoded characters
+    path = unquote(path)
 
-    allowed_methods = [m.lower() for m in spec["paths"][path].keys()]
-    if method.lower() not in allowed_methods:
-        raise InvalidRequestException(
-            f"Method '{method}' not allowed for path '{path}'"
-        )
+    for template in spec["paths"]:
+        if re.match(path_template_to_regex(template), path):
+            allowed_methods = [m.lower() for m in spec["paths"][template].keys()]
+            if method.lower() in allowed_methods:
+                return
+            else:
+                raise InvalidRequestException(
+                    f"Method '{method}' not allowed for path '{path}'"
+                )
+    raise InvalidRequestException(f"Path '{path}' not found in OpenAPI spec")
 
 
 async def check_request_validity(
