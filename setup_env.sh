@@ -75,7 +75,7 @@ cp "$PROJECT_PATH"/"$DEBUG_ENV" "$WORKTREE_DIR/.env"
 # Start OpenCode
 cd "$WORKTREE_DIR"
 PORT=$(find_free_port 4100)  # Implement find_free_port as before
-opencode serve --port $PORT --hostname 127.0.0.1 --no-mdns > server.log 2>&1 &
+/home/appuser/.opencode/bin/opencode serve --port $PORT --hostname 127.0.0.1 --no-mdns > server.log 2>&1 &
 echo $! > /tmp/opencode-pid-${CORR_ID}
 
 # Output to n8n
