@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e pipefail
+set -euo pipefail
 
 find_free_port() {
     local range_start=4100

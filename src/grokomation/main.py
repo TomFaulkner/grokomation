@@ -38,7 +38,9 @@ async def lifespan(app: FastAPI):
         repo_url = os.getenv("REPO_URL")
         if repo_url:
             logger.info(f"Cloning repo from {repo_url} to {repo_path}")
-            subprocess.run(["git", "clone", repo_url, repo_path], check=True)
+            subprocess.run(
+                ["git", "clone", repo_url, repo_path], check=True, timeout=120
+            )
             logger.info("Repo cloned successfully")
 
     yield  # The app runs normally here
