@@ -98,6 +98,7 @@ async def setup(data: SetupRequest) -> SetupAPIResponse:
             check=True,
             capture_output=True,
             text=True,
+            timeout=30,
         )
         logger.debug("Shell stdout: %s", results.stdout)
         logger.error("Shell stderr: %s", results.stderr)
