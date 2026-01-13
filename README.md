@@ -127,4 +127,3 @@ uv run ruff format .
 - **Git Clone Fails**: Verify SSH key setup and repository access.
 - **Port Conflicts**: OpenCode instances use ports 4100-4200; ensure availability.
 - **Volume Issues**: Named volumes persist data; inspect with `docker volume ls`.
-

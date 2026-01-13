@@ -1,4 +1,7 @@
 from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any
+from pydantic import Field
 import logging
 import os
 import subprocess
@@ -51,8 +54,22 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+class TracebackEntry(BaseModel):
+    file: str
+    line: int
+    function: str
+    stack_trace: str
+
+
 class SetupRequest(BaseModel):
-    correlation_id: str
+    correlation_id: str | None = None
+    now: datetime = Field(default_factory=datetime.utcnow)
+    traceback: TracebackEntry | None = None
+    error: str
+    request_url: str | None = None
+    request_method: str | None = None
+    host: str
+    type: str
 
 
 class SetupShellResponse(BaseModel):
@@ -65,12 +82,14 @@ class SetupShellResponse(BaseModel):
 
 
 class SetupAPIResponse(BaseModel):
+    correlation_id: str | None = None
     status: str
-    corr_id: str
 
 
 @app.post("/instances", tags=["instances"])
 async def setup(data: SetupRequest) -> SetupAPIResponse:
+    if not data.correlation_id:
+        data.correlation_id = f"corr-{int(datetime.utcnow().timestamp() * 1000)}"
     try:
         results = subprocess.run(
             ["./setup_env.sh", data.correlation_id],
@@ -89,7 +108,7 @@ async def setup(data: SetupRequest) -> SetupAPIResponse:
 
     instances[data.correlation_id] = shell_response.port
     return SetupAPIResponse(
-        **{"status": "setup_complete", "corr_id": data.correlation_id}
+        **{"status": "setup_complete", "correlation_id": data.correlation_id}
     )
 
 
