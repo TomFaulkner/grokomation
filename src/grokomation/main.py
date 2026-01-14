@@ -1,12 +1,10 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any
 from pydantic import Field
 import logging
 import os
 import subprocess
 from typing import cast
-from urllib.parse import unquote
 
 from fastapi import FastAPI, Request, Response, HTTPException, Query
 import httpx
@@ -19,6 +17,14 @@ from slowapi.errors import RateLimitExceeded
 from grokomation.config import settings
 from grokomation import processes
 from grokomation.opencode import check_request_validity, InvalidRequestException
+from grokomation.database import (
+    init_db,
+    insert_instance,
+    delete_instance,
+    get_all_instances,
+    get_instance_port,
+    insert_chat,
+)
 
 
 settings = settings  # loading for settings validation for shell scripts
@@ -44,11 +50,14 @@ async def lifespan(app: FastAPI):
             )
             logger.info("Repo cloned successfully")
 
+    # Initialize database
+    init_db()
+    logger.info("Database initialized")
+
     yield  # The app runs normally here
 
 
 app = FastAPI(lifespan=lifespan)
-instances: dict[str, int] = {}  # correlation_id → internal_port
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -112,7 +121,7 @@ async def setup(data: SetupRequest) -> SetupAPIResponse:
         logging.exception(f"Setup failed: {cast('str', e.stderr)}")
         raise HTTPException(500, f"Setup failed: {e}")
 
-    instances[data.correlation_id] = shell_response.port
+    insert_instance(data.correlation_id, shell_response.port)
     logger.info(
         f"Setup complete for correlation_id={data.correlation_id} on port {shell_response.port}"
     )
@@ -137,13 +146,28 @@ async def cleanup(corr_id: str):
         logging.exception(f"Cleanup failed: {cast('str', e.stderr)}")
         raise HTTPException(500, f"Cleanup failed: {e}")
 
-    _ = instances.pop(corr_id, None)
+    delete_instance(corr_id)
     return {"status": "cleaned"}
 
 
 @app.get("/instances", tags=["instances"])
 def get_instances() -> dict[str, int]:
-    return instances
+    return get_all_instances()
+
+
+@app.post("/instances/{corr_id}/chat", tags=["instances"])
+async def save_chat(corr_id: str, chat_data: dict):
+    """Save chat data for an instance."""
+    # Verify instance exists
+    if get_instance_port(corr_id) is None:
+        raise HTTPException(404, "Instance not found")
+
+    # Convert dict to JSON string and save
+    import json
+
+    chat_json = json.dumps(chat_data)
+    insert_chat(corr_id, chat_json)
+    return {"status": "chat_saved"}
 
 
 @app.get("/health", tags=["health"])
@@ -179,21 +203,20 @@ def kill_process(pid: int) -> KillProcessResponse:
 
 
 async def _proxy_request(corr_id: str, path: str, request: Request) -> Response:
-    if corr_id not in instances:
+    port = get_instance_port(corr_id)
+    if port is None:
         raise HTTPException(404, "No active session")
     if not path.startswith("/"):
         path = "/" + path
     try:
-        await check_request_validity(
-            "localhost", instances[corr_id], request.method, path
-        )
+        await check_request_validity("localhost", port, request.method, path)
     except InvalidRequestException as e:
         raise HTTPException(422, str(e))
     except httpx.RequestError as e:
         raise HTTPException(502, f"Error fetching OpenAPI spec: {str(e)}")
     except Exception as e:
         raise HTTPException(500, f"Error validating request: {str(e)}")
-    url = f"http://localhost:{instances[corr_id]}{path}"
+    url = f"http://localhost:{port}{path}"
     headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
     headers["content-type"] = "application/json"
     async with AsyncClient() as client:
