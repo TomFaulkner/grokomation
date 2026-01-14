@@ -23,6 +23,7 @@ from grokomation.database import (
     delete_instance,
     get_all_instances,
     get_instance_port,
+    insert_chat,
 )
 
 
@@ -152,6 +153,21 @@ async def cleanup(corr_id: str):
 @app.get("/instances", tags=["instances"])
 def get_instances() -> dict[str, int]:
     return get_all_instances()
+
+
+@app.post("/instances/{corr_id}/chat", tags=["instances"])
+async def save_chat(corr_id: str, chat_data: dict):
+    """Save chat data for an instance."""
+    # Verify instance exists
+    if get_instance_port(corr_id) is None:
+        raise HTTPException(404, "Instance not found")
+
+    # Convert dict to JSON string and save
+    import json
+
+    chat_json = json.dumps(chat_data)
+    insert_chat(corr_id, chat_json)
+    return {"status": "chat_saved"}
 
 
 @app.get("/health", tags=["health"])

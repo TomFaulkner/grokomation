@@ -15,12 +15,21 @@ def get_db():
 
 
 def init_db():
-    """Initialize the database and create instances table if it doesn't exist."""
+    """Initialize the database and create instances and chats tables if they don't exist."""
     with get_db() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS instances (
                 correlation_id TEXT PRIMARY KEY,
                 port INTEGER NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                correlation_id TEXT NOT NULL,
+                chat_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (correlation_id) REFERENCES instances (correlation_id)
             )
         """)
         conn.commit()
@@ -71,3 +80,13 @@ def instance_exists(correlation_id: str) -> bool:
             (correlation_id,),
         )
         return cursor.fetchone() is not None
+
+
+def insert_chat(correlation_id: str, chat_data: str):
+    """Insert a chat entry for the given correlation_id."""
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO chats (correlation_id, chat_data) VALUES (?, ?)",
+            (correlation_id, chat_data),
+        )
+        conn.commit()
